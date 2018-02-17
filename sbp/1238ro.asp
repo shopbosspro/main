@@ -2,6 +2,7 @@
 <!-- #include file=aspscripts/adovbs.asp -->
 <!-- #include file=aspscripts/conn.asp -->
 <%
+' just adding a comment
 shopid = request.cookies("shopid")
 shopname = request.cookies("shopname")
 

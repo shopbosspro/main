@@ -1,0 +1,830 @@
+<!-- #include file=aspscripts/auth.asp --> 
+<!-- #include file=aspscripts/adovbs.asp -->
+<!-- #include file=aspscripts/conn.asp -->
+
+
+<html>
+<!-- Copyright 2011 - Boss Software Inc. --><head><meta name="robots" content="noindex,nofollow">
+<style type="text/css">
+<!--
+a            { text-decoration: none }
+-->
+select{
+	width:150px;
+}
+</style>
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+<meta name="GENERATOR" content="Microsoft FrontPage 12.0">
+<meta name="ProgId" content="FrontPage.Editor.Document">
+<title><%=request.cookies("shopname")%></title>
+<%
+function formatdollar(a)
+
+	if isnull(a) then
+		formatdollar = "0.00"
+	else	
+		formatdollar = formatnumber(a,2)
+	end if
+
+end function
+
+'check for required fields
+strsql = "Select * from repairorders where shopid = '" & request.cookies("shopid") & "' and ROID = " & request("roid")
+set rs = con.execute(strsql)
+'calculate gp
+if len(rs("tagnumber")) > 0 then
+	roid = rs("tagnumber")
+else
+	roid = rs("roid")
+end if
+pc = rs("partscost")
+if rs("datein") >= #11/11/2005# then
+	pro = "printronewall.asp?sp=viewro.asp"
+else
+	pro = "printro.asp"
+end if
+rstmt = "Select RequireSource, RequireComplaint from company where shopid = '" & request.cookies("shopid") & "'"
+set rrs = con.execute(rstmt)
+rrs.movefirst
+response.write chr(10) & "<script language=""javascript"">" & chr(10)
+response.write vbTab & "function saveAll(dir, itype, sid, pid, lid){" & chr(10)
+response.write vbTab & "document.getElementById('hider').style.display='block'" & chr(10)
+response.write vbTab & "document.getElementById('timer').style.display='block'" & chr(10)
+response.write vbTab & "document.theform.dir.value = dir" & chr(10)
+response.write vbTab & "document.theform.itype.value = itype" & chr(10)
+response.write vbTab & "document.theform.sid.value = sid" & chr(10)
+response.write vbTab & "document.theform.pid.value = pid" & chr(10)
+response.write vbTab & "document.theform.lid.value = lid" & chr(10)
+response.write vbTab & "//check for miles, writer and source" & chr(10)
+response.write vbTab & "i = 0" & chr(10)
+response.write vbTab & "newline = '\r\r'" & chr(10)
+response.write vbTab & "errmess = 'Required Fields are not Complete'" & chr(10)
+rrs.movefirst
+if ucase(rs("Status")) = "CLOSED" or ucase(rs("Status")) = "FINAL" then
+if rrs("RequireSource") = "yes" then
+	response.write vbTab & "if (document.theform.Source.value.length == 0){" & chr(10)
+	response.write vbTab & vbTab & "i++" & chr(10)
+	response.write vbTab & vbTab & "errmess = errmess + newline + 'Source is a required field.'}" & chr(10)
+end if
+if rrs("RequireComplaint") = "yes" then
+	response.write vbTab & "if (document.theform.Comments.value.length == 0){" & chr(10)
+	response.write vbTab & vbTab & "i++" & chr(10)
+	response.write vbTab & vbTab & "errmess = errmess + newline + 'Comments is a required field.'}" & chr(10)
+end if
+end if
+response.write vbTab & "if (i > 0){" & chr(10)
+response.write vbTab & vbTab & "alert(errmess+newline)" & chr(10)
+response.write vbTab & "}else{t=setTimeout('document.theform.submit()',500)" & chr(10)
+response.write vbTab & "}}" & chr(10)
+response.write "</script>"
+set rrs = nothing
+homephone = "(" & left(rs("CustomerPhone"),3) & ") " & mid(rs("CustomerPhone"),4,3) & "-" & right(rs("CustomerPhone"),4)
+workphone = "(" & left(rs("CustomerWork"),3) & ") " & mid(rs("CustomerWork"),4,3) & "-" & right(rs("CustomerWork"),4)
+cellphone = "(" & left(rs("CellPhone"),3) & ") " & mid(rs("CellPhone"),4,3) & "-" & right(rs("CellPhone"),4)
+'ttlsub = rs("totalsublet")
+'response.write ttlsub
+ttlprts = rs("totalprts")
+'ttllbr = rs("totallbr")
+if ucase(rs("Status")) = "CLOSED" then 
+	if request("sp") = "history.asp" then
+		newsp = "history.asp?lic=" & request("lic") & "&roid=" & request("roid") & "&sp=" & request("sp")
+	elseif request("sp") = "findroframe.asp" then
+		newsp = "viewro.asp?roid=" & request("roid") & "&srch=" & request("srch") & "&sf=" & request("sf") & "&SortBy=" & request("SortBy") & "&sp=" & request("sp")
+	elseif request("sp") = "wip.asp" then
+		newsp = "viewro.asp?roid=" & request("roid")
+	else
+		newsp = "wip.asp"
+	end if
+end if
+
+%>
+
+<script type="text/javascript" src="javascripts/ro.js"></script>
+<style type="text/css">
+<!--
+p, td, th, li { font-size: 10pt; font-family: Verdana, Arial, Helvetica }
+.style1 {
+	border-width: 0;
+	font-family: Arial;
+	color: white;
+	/*background-color: #0066CC;*/
+}
+.abuts{
+	font-size:10px;
+	width:50px;
+	height:18px;
+	cursor:hand;
+}
+#hider{
+	position:absolute;
+	top:0px;
+	left:0px;
+	width:100%;
+	height:100%;
+	background-color:gray;
+	-ms-filter:"progid:DXImageTransform.Microsoft.Alpha(Opacity=70)";
+	filter: alpha(opacity=50); 
+	-moz-opacity:.50; 
+	opacity: .5;
+	z-index:998;
+	display:none;
+
+}
+#timer{
+	background-color:white;
+	position:absolute;
+	top:25%;
+	left:25%;
+	width:50%;
+	height:20%;
+	z-index:999;
+	display:none;
+	text-align:center;
+	border:4px navy outset;
+	color:black;
+	padding-top:10%;
+	font-family:Verdana, Arial, sans-serif;
+	font-weight:bold;
+}
+
+#history{
+	width:90%;
+	height:90%;
+	top:5%;
+	left:5%;
+	background-color:white;
+	position:absolute;
+	z-index:1000;
+	border:medium navy outset;
+}
+-->
+
+.menustyle{
+	text-align: center;
+	background-color: #F0F0F0;
+	width:16.5%;
+	border:1px gray outset;
+	color:maroon;
+	font-weight:bold;
+	cursor:pointer;
+}
+
+.style8 {
+	text-align: center;
+	color: #FFFFFF;
+	border-width: 1px;
+	background-image:url('newimages/pageheader.jpg');
+}
+
+.style9 {
+	color: #FFFFFF;
+	font-weight: bold;
+	border-width: 1px;
+	background-image:url('newimages/rosubheader.jpg');
+}
+
+.style10 {
+	background-image: url('newimages/wipheader.jpg');
+}
+
+.style13 {
+	color: #FFFFFF;
+}
+.style14 {
+	color: white;
+	border-width: 0;
+	background-color: #0066CC;
+}
+.style15 {
+	border-width: 0;
+}
+
+.style16 {
+	border-collapse: collapse;
+	border-style: solid;
+	border-width: 1px;
+}
+.style17 {
+	border-style: solid;
+	border-width: 0;
+	color: #FFFFFF;
+	background-color: #0066CC;
+}
+.style18 {
+	text-align: right;
+}
+.style20 {
+	border-width: 0;
+	text-align: right;
+}
+.style21 {
+	color: #FFFFFF;
+	border-width: 1px;
+	background-color: #0066CC;
+}
+
+</style>
+
+<script type="text/javascript" language="javascript">
+
+function showPics(){
+
+	document.getElementById("picframe").style.display = "block"
+	document.getElementById("hider").style.display = "block"
+
+
+}
+
+
+var xmlHttp
+function showHistory(){
+	document.getElementById("hider").style.display = "block"
+	document.getElementById("history").style.display = "block"
+
+}
+
+function reloadPage(){
+	document.body.onunload='';
+	saveAll('ro.asp?a=n','','','','','')
+}
+t = setTimeout("reloadPage()",300000)
+
+
+
+
+</script>
+</head>
+
+<body  link="#800000" vlink="#800000" alink="#800000"  onunload="javascript:saveAll('wip.asp?a=n','','','','','')" onload="showMiles()" topmargin="0" leftmargin="0" marginwidth="0" marginheight="0">
+
+<table border=2 cellpadding=0 cellspacing=0 width=100% bordercolor="#0066CC" style="border-collapse: collapse"><tr><td>
+<form name="theform" method="post" action="savero.asp">
+ <input type="hidden" name="dir" value><input type="hidden" name="itype" value><input type="hidden" name="pid" value><input type="hidden" name="sid" value><input type="hidden" name="lid" value>
+  <center>
+  <table border="0" cellpadding="0" cellspacing="0" width="100%">
+   <tr>
+    <td width=" valign="top">
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse" bordercolor="#111111">
+       <tr>
+        <td valign="top" width="100%">
+          <table border="0" cellpadding="0" cellspacing="0" width="100%">
+           <tr>
+            <td height="22" ><table border="0" width="100%" cellspacing="0" cellpadding="0">
+              <tr>
+               <td width="100%" align="center" class="style10" ><b><i>
+               <font color="#FFFF00" size="5">RO#&nbsp;<%=roid%></font></i></b><img style="position:absolute;right:5px;top:0px;" alt="" height="37" src="newimages/shopbosslogo-ro.png" width="157"></td>
+              </tr>
+              <tr>
+               <td width="100%" align="left" bgcolor="#0066CC">
+
+             
+               <table style="width: 100%">
+				   <tr>
+					   <td onclick="location.href='pdfinvoices/printpdfro.asp?roid=<%=request("roid")%>'" valign="middle" class="menustyle">
+					   <img alt="" height="30" src="newimages/printer_icon.gif" width="33"><br>Print 
+					   RO</td>
+					   <td onclick="showHistory()" class="menustyle">
+					   <img alt="" height="30" src="newimages/historyx30.png" width="30"><br>
+					   History</td>
+					   <td onclick="showPics()" class="menustyle">
+					   <img alt="" height="30" src="newimages/camera.jpg" width="35"><br>
+					   View Pics</td>
+					   <td onclick="location.href='wip.asp'" class="menustyle">
+					   <img alt="" height="30" src="newimages/save.png" width="30">&nbsp;<br>
+					   Exit</td>
+				   </tr>
+			   </table>
+
+             
+               </td>
+              </tr>
+
+             </table>
+             </td>
+           </tr>
+          </table>
+         <center>
+         <table border="0" width="100%" cellspacing="0" cellpadding="0" style="border-collapse: collapse" bordercolor="#111111">
+          <tr>
+           <td width="34%" valign="top" bgcolor="#ffffff" height="170">
+           <table width="100%" cellspacing="0" cellpadding="2" bordercolor="#111111" height="100%" class="style16">
+             <tr>
+              <td width="10%" align="right" valign="bottom" class="style14">
+              <font size="2" face="Arial">Customer:</font></td>
+              <td width="20%" bgcolor="#FFFFFF" valign="bottom" bordercolor="#000000" class="style15"><font size="2" face="arial"><%=rs("Customer")%></font>&nbsp;</td>
+             </tr>
+             <tr>
+              <td width="10%" align="right" valign="bottom" class="style14">
+              <font size="2" face="Arial">Address:</font></td>
+              <td width="20%" bgcolor="#FFFFFF" valign="bottom" bordercolor="#000000" class="style15"><font size="2" face="arial"><%=rs("CustomerAddress")%></font>&nbsp;</td>
+             </tr>
+             <tr>
+              <td width="10%" align="right" valign="bottom" class="style14">
+              <font size="2" face="Arial">City,State,Zip:</font></td>
+              <td width="20%" bgcolor="#FFFFFF" valign="bottom" bordercolor="#000000" class="style15"><font size="2" face="arial"><%=rs("CustomerCSZ")%></font>&nbsp;</td>
+             </tr>
+             <tr>
+              <td width="10%" align="right" valign="bottom" class="style14">
+              <font size="2" face="Arial">Home:</font></td>
+              <td width="20%" bgcolor="#FFFFFF" valign="bottom" bordercolor="#000000" class="style15"><font size="2" face="arial"><%=homephone%></font>&nbsp;</td>
+             </tr>
+             <tr>
+              <td width="10%" align="right" valign="bottom" class="style14">
+              <font size="2" face="Arial">Work:</font></td>
+              <td width="20%" bgcolor="#FFFFFF" valign="bottom" bordercolor="#000000" class="style15"><font size="2" face="arial"><%=workphone%></font>&nbsp;</td>
+             </tr>
+             <tr>
+              <td width="10%" align="right" valign="bottom" class="style14">
+              <font size="2" face="Arial">Cell:</font></td>
+              <td width="20%" bgcolor="#FFFFFF" valign="bottom" bordercolor="#000000" class="style15"><font size="2" face="arial"><%=cellphone%></font>&nbsp;</td>
+             </tr>
+             <tr>
+              <td style="font-family:Arial;font-size:x-small;font-weight:normal" width="10%" align="right" valign="bottom" class="style1">
+              Bus. Contact</td>
+              <td width="20%" bgcolor="#FFFFFF" valign="bottom" bordercolor="#000000" class="style15"><%=rs("contact")%>&nbsp;</td>
+             </tr>
+            </table></td>
+           <td width="33%" valign="top" bgcolor="#FFFFFF" height="170">
+           <table width="100%" cellspacing="0" cellpadding="2" bordercolor="#111111" height="100%" class="style16">
+             <tr>
+              <td width="10%" align="right" valign="top" class="style14">
+              <font size="2" face="Arial">Vehicle:</font></td>
+              <td style="overflow:hidden" width="20%" bgcolor="#FFFFFF" valign="top" class="style15"><font size="2" face="arial"><%=left(rs("VehInfo"),27)%></font></td>
+             </tr>
+             <tr>
+              <td width="10%" align="right" valign="top" class="style14">
+              <font size="2" face="Arial">License:</font></td>
+              <td width="20%" bgcolor="#FFFFFF" valign="top" class="style15"><font size="2" face="arial"><%=rs("VehLicNum")%>&nbsp;&nbsp;&nbsp;Fleet #<%=rs("fleetno")%></font></td>
+             </tr>
+             <tr>
+              <td width="10%" align="right" valign="top" class="style14">
+              <font size="2" face="Arial">VIN:</font></td>
+              <td width="20%" bgcolor="#FFFFFF" valign="top" class="style15"><font size="2" face="arial"><%=rs("Vin")%></font>&nbsp;</td>
+             </tr>
+             <tr>
+              <td width="10%" align="right" valign="top" class="style14">
+              <font size="2" face="Arial">Miles In:</font></td>
+              <td width="20%" bgcolor="#FFFFFF" valign="top" class="style15">
+               <font size="2" face="arial">
+               <%=rs("VehicleMiles")%></b></font></td>
+             </tr>
+             <tr>
+              <td width="10%" align="right" valign="top" class="style14">
+              <font size="2" face="Arial">Miles Out:</font></td>
+              <td width="20%" bgcolor="#FFFFFF" valign="top" class="style15">
+               <%=rs("MilesOut")%>&nbsp;</td>
+             </tr>
+             <tr>
+              <td width="10%" align="right" valign="top" class="style14">
+              <font size="2" face="Arial">Engine/Cyl:</font></td>
+              <td width="20%" bgcolor="#FFFFFF" valign="top" class="style15"><font size="2" face="arial"><%=rs("VehEngine")%>&nbsp;&nbsp;<%=rs("Cyl")%>Cyl</font></td>
+             </tr>
+             <tr>
+              <td width="10%" align="right" valign="top" class="style14">
+              <font size="2" face="Arial">Trans/Drive:</font></td>
+              <td width="20%" bgcolor="#FFFFFF" valign="top" class="style15"><font size="2" face="arial"><%=rs("VehTrans")%>&nbsp;&nbsp;&nbsp;&nbsp;<%=rs("DriveType")%></font></td>
+             </tr>
+            </table></td>
+           <td width="33%" valign="top" height="170">
+           <table border="1" width="100%" cellspacing="0" cellpadding="2" style="border-collapse: collapse" bordercolor="#111111" height="100%">
+             <tr>
+              <td width="10%" align="right" valign="top" height="44" style="height: 22px" class="style14">
+			  RO Date</td>
+              <td width="0%" bgcolor="#FFFFFF" valign="top" height="44" style="height: 22px" class="style15">
+			  <%=rs("datein")%></td>
+             </tr>
+             <tr>
+              <td width="10%" align="right" valign="top" height="44" style="height: 22px" class="style14">
+			  Status</td>
+              <td width="0%" bgcolor="#FFFFFF" valign="top" height="44" style="height: 22px" class="style15">
+			  <%
+              	if isnumeric(left(rs("status"),1)) then
+              		displays = right(s,len(s)-1)
+              	else
+              		displays = s
+              	end if
+				response.write s
+			  %>
+			  </td>
+             </tr>
+             <tr>
+              <td width="10%" align="right" valign="top" height="31" class="style14"><font size="2" face="arial">Comments:</font></td>
+              <td width="0%" bgcolor="#FFFFFF" valign="top" height="31" class="style15">
+			  <%=rs("Comments")%>&nbsp;</td>
+             </tr>
+             <tr>
+              <td width="10%" align="right" valign="top" height="22" class="style14"><font size="2" face="arial">Writer:</font></td>
+              <td width="0%" bgcolor="#FFFFFF" valign="top" height="22" class="style15">
+               <%=rs("Writer")%>&nbsp;</td>
+             <tr>
+              <td width="10%" align="right" valign="bottom" height="22" class="style14"><font size="2" face="arial">Source:</font></td>
+              <td width="20%" bgcolor="#FFFFFF" valign="bottom" height="22" class="style15"><font size="2" face="arial">
+               <%=rs("Source")%></font></td>
+             </tr>
+             <tr>
+              <td width="10%" align="right" valign="bottom" height="22" class="style14">
+               <p align="right" class="style13"><font size="2" face="arial">Type:</font></td>
+
+
+              <td width="20%" bgcolor="#FFFFFF" valign="bottom" height="22" class="style15">
+			  <%=rs("ROType")%>&nbsp;</td>
+             </tr>
+            </table></td>
+          </tr>
+          <tr>
+           <td style="max-height:500px;overflow-y:scroll" width="67%" valign="top" bgcolor="#FFFFFF" colspan="2">
+
+           <!-- #include file=complaintlayoutview.asp -->
+
+           </td>
+           <td width="33%" valign="top" >
+           <table border="1" width="100%" cellspacing="0" cellpadding="2" style="border-collapse: collapse; height:30px;" bordercolor="#111111">
+             <tr>
+              <td style="cursor:pointer" id="revcell" Width="25%" align="center" onclick="revChg()" class="style9">
+			  <img alt="" height="30" src="newimages/desktop.png" width="30"><br>Revisions</td>
+              <td style="cursor:pointer" id="feecell" width="25%" align="center" onclick="feesChg()" class="style9">
+			  <img alt="" height="30" src="newimages/discount_icon.png" width="28"><br>Fees/Disc</td>
+              <td style="cursor:pointer" id="warrcell" width="25%" align="center" onclick="warrChg()" class="style9">
+			  <img alt="" height="30" src="newimages/warricon2.png" width="32"><br>Warranty</td>
+              <td style="cursor:pointer" id="pmtscell" width="25%" align="center"onclick="pmtsChg()" class="style9">
+			  <img alt="" height="30" src="newimages/payment.png" width="30"><br>Payments</td>
+             </tr>
+            </table><table cellspacing="0" cellpadding="0" width="100%" border="0">
+             <tr>
+              <td id="est" style="display:block">
+              <table width="100%" cellspacing="0" cellpadding="2" bordercolor="#111111" class="style16">
+                <tr>
+                 <td width="50%" colspan="2" class="style17">
+                  <p align="right" class="style13">Original Estimate:</p>
+                 </td>
+                 <td width="50%" colspan="2" bgcolor="#FFFFFF" class="style15"><%=formatnumber(rs("OrigRO"),2)%>&nbsp;</td>
+                </tr>
+                <tr>
+                 <td width="50%" colspan="2" class="style17">
+                  <p align="center" class="style13"><u>Revision 1</u></p>
+                 </td>
+                 <td width="50%" colspan="2" class="style17">
+                  <p align="center" class="style13"><u>Revision 2</u></p>
+                 </td>
+                </tr>
+                <tr>
+                 <td width="25%" align="right" class="style17"><font size="2">Amt:&nbsp;</font></td>
+                 <td width="25%" bgcolor="#FFFFFF" class="style20"><%=formatnumber(rs("Rev1Amt"),2)%>&nbsp;</td>
+                 <td width="25%" align="right" class="style17"><font size="2">Amt:&nbsp;</font></td>
+                 <td width="25%" bgcolor="#FFFFFF" class="style20"><%=formatnumber(rs("Rev2Amt"),2)%>&nbsp;</td>
+                </tr>
+                <tr>
+                 <td width="25%" align="right" class="style17"><font size="2">Date:&nbsp;</font></td>
+                 <td width="25%" bgcolor="#FFFFFF" class="style20"><%=rs("Rev1Date")%>&nbsp;</td>
+                 <td width="25%" align="right" class="style17"><font size="2">Date:&nbsp;</font></td>
+                 <td width="25%" bgcolor="#FFFFFF" class="style20"><%=rs("Rev2Date")%>&nbsp;</td>
+                </tr>
+                <tr>
+                 <td width="25%" align="right" class="style17"><font size="2">Phone:&nbsp;</font></td>
+                 <td width="25%" bgcolor="#FFFFFF" class="style20"><%=rs("Rev1Phone")%>&nbsp;</td>
+                 <td width="25%" align="right" class="style17"><font size="2">Phone:&nbsp;</font></td>
+                 <td width="25%" bgcolor="#FFFFFF" class="style20"><%=rs("Rev2Phone")%>&nbsp;</td>
+                </tr>
+                <tr>
+                 <td width="25%" align="right" class="style17"><font size="2">Time:&nbsp;</font></td>
+                 <td width="25%" bgcolor="#FFFFFF" class="style20"><%=rs("Rev1Time")%>&nbsp;</td>
+                 <td width="25%" align="right" class="style17"><font size="2">Time:&nbsp;</font></td>
+                 <td width="25%" bgcolor="#FFFFFF" class="style20"><%=rs("Rev2Time")%>&nbsp;</td>
+                </tr>
+                <tr>
+                 <td width="25%" align="right" class="style17"><font size="2">By:&nbsp;</font></td>
+                 <td width="25%" bgcolor="#FFFFFF" class="style20"><%=rs("Rev1By")%>&nbsp;</td>
+                 <td width="25%" align="right" class="style17"><font size="2">By:&nbsp;</font></td>
+                 <td width="25%" bgcolor="#FFFFFF" class="style20"><%=rs("Rev2By")%>&nbsp;</td>
+                </tr>
+               </table></td>
+             </tr>
+             <tr>
+              <td id="fees" style="display:none">
+              <table width="100%" cellspacing="0" cellpadding="2" bordercolor="#111111" class="style16">
+                <tr>
+                 <td width="50%" align="right" class="style14"><font size="2">Haz. Waste
+                  Fee:&nbsp;</font></td>
+                 <td width="50%" align="right" bgcolor="#FFFFFF" class="style15">
+                  <p align="right"><%=formatdollar(rs("HazardousWaste"))%>&nbsp;</p>
+                 </td>
+                </tr>
+  <center>
+         <center>
+                <tr>
+                 <td width="50%" align="right" class="style14"><font size="2">Ca. Tire
+                  Fee:&nbsp;</font></td>
+                </center></center>
+                 <td width="50%" align="right" bgcolor="#FFFFFF" class="style15">
+                  <p align="right"><%=formatdollar(rs("UserFee1"))%>&nbsp;</p>
+         </td>
+                </tr>
+                <tr>
+                 <td width="50%" align="right" class="style14"><font size="2">Storage
+                  Fee:&nbsp;</font></td>
+                 <td width="50%" align="right" bgcolor="#FFFFFF" class="style15">
+				 <%=formatdollar(rs("UserFee2"))%>&nbsp;</td>
+                </tr>
+                <tr>
+                 <td width="50%" align="right" class="style14"><font size="2">Parts Tax Rate:&nbsp;</font></td>
+                 <td width="50%" align="right" bgcolor="#FFFFFF" class="style15"><%=rs("TaxRate")%><b><font size="3">%</font></b></td>
+                </tr>
+                <tr>
+                 <td width="50%" align="right" class="style14">Labor Tax Rate:&nbsp; </td>
+                 <td width="50%" align="right" bgcolor="#FFFFFF" class="style15"><%=rs("LaborTaxRate")%>
+                 <b><font size="3">%</font></b></td>
+                </tr>
+                <tr>
+                 <td width="50%" align="right" class="style14">Sublet Tax Rate:&nbsp; </td>
+                 <td width="50%" align="right" bgcolor="#FFFFFF" class="style15"><%=rs("SubletTaxRate")%>
+                 <b><font size="3">%</font></b></td>
+                </tr>
+                <tr>
+                 <td width="50%" align="right" class="style14"><font size="2">Discount
+                  Amt:&nbsp;</font></td>
+                 <td width="50%" align="right" bgcolor="#FFFFFF" class="style15">
+				 <%=formatdollar(rs("DiscountAmt"))%>&nbsp;</td>
+                </tr>
+                </table></td>
+             </tr>
+             <tr>
+              <td id="warr" style="display:none">
+              <table width="100%" cellspacing="0" cellpadding="2" bordercolor="#111111" class="style16">
+                <tr>
+                 <td width="50%" align="right" class="style17"><font size="2">Warranty
+                  Months:&nbsp;</font></td>
+                 <td width="50%" bgcolor="#FFFFFF" class="style18"><%=rs("WarrMos")%>&nbsp;</td>
+                </tr>
+                <tr>
+                 <td width="50%" align="right" class="style17"><font size="2">Warranty
+                  Miles:&nbsp;</font></td>
+                 <td width="50%" bgcolor="#FFFFFF" class="style18"><%=rs("WarrMiles")%>&nbsp;</td>
+                </tr>
+                <tr>
+                 <td width="50%" align="right" class="style17">&nbsp;</td>
+                 <td width="50%" bgcolor="#FFFFFF" class="style18"><input style="visibility:hidden; height:18" type="text" name="T26" size="7"></td>
+                </tr>
+                <tr>
+                 <td width="50%" align="right" class="style17">&nbsp;</td>
+                 <td width="50%" bgcolor="#FFFFFF" class="style18"><input style="visibility:hidden; height:18" type="text" name="T28" size="7"></td>
+                </tr>
+                <tr>
+                 <td width="50%" align="right" class="style17">&nbsp;</td>
+                 <td width="50%" bgcolor="#FFFFFF" class="style18"><input style="visibility:hidden; height:18" type="text" name="T27" size="7"></td>
+                </tr>
+                <tr>
+                 <td width="50%" align="right" class="style17">&nbsp;</td>
+                 <td width="50%" bgcolor="#FFFFFF" class="style18"><input style="visibility:hidden; height:18" type="text" name="T29" size="7"></td>
+                </tr>
+                <tr>
+                 <td width="50%" align="right" class="style17">&nbsp;</td>
+                 <td width="50%" bgcolor="#FFFFFF" class="style18">&nbsp;</td>
+                </tr>
+               </table></td>
+             </tr>
+             <tr>
+              <td id="pmts" style="display:none" class="style15">
+              <table width="100%" border="1" cellspacing="1" cellpadding="2" style="border-collapse: collapse" bordercolor="#111111">
+                <tr>
+                 <td width="50%" align="right" class="style14"><font size="2">How Paid:&nbsp;</font></td>
+                 <td width="50%" bgcolor="#FFFFFF" class="style20"><%=rs("HowPaid")%>&nbsp;</td>
+                <tr>
+                 <td width="50%" align="right" class="style14"><font size="2">Amt Paid:&nbsp;</font></td>
+                 <td width="50%" bgcolor="#FFFFFF" class="style20"><%=formatdollar(rs("AmtPaid1"))%>&nbsp;</td>
+                </tr>
+                <tr>
+                 <td width="50%" align="right" class="style14"><font size="2">Number:&nbsp;</font></td>
+                 <td width="50%" bgcolor="#FFFFFF" class="style20"><%=rs("CheckNum1")%>&nbsp;</td>
+                </tr>
+                <tr>
+                 <td width="50%" align="right" class="style14"><font size="2">How Paid:&nbsp;</font></td>
+                 <td width="50%" bgcolor="#FFFFFF" class="style20"><%=rs("HowPaid2")%>&nbsp;</td>
+                </tr>
+                <tr>
+                 <td width="50%" align="right" class="style14"><font size="2">Amt Paid:&nbsp;</font></td>
+                 <td width="50%" bgcolor="#FFFFFF" class="style20"><%=formatdollar(rs("AmtPaid2"))%>&nbsp;</td>
+                </tr>
+                <tr>
+                 <td width="50%" align="right" class="style14"><font size="2">Number:&nbsp;</font></td>
+                 <td width="50%" bgcolor="#FFFFFF" class="style20"><%=rs("CheckNum2")%>&nbsp;</td>
+                </tr>
+                <tr>
+                 <td width="50%" align="right" class="style14">&nbsp;</td>
+                 <td width="50%" bgcolor="#FFFFFF" class="style20">&nbsp;</td>
+                </tr>
+               </table></td>
+             </tr>
+            </table>
+           <table width="100%" cellspacing="0" cellpadding="3" class="style16">
+             <tr>
+              <td style="padding:5px;" width="100%" colspan="2" class="style8">
+               <strong>** Totals **</strong></td>
+             </tr>
+             <%
+if taxparts > 0.01 then
+	salestax = round(taxparts * (rs("TaxRate") / 100),2)
+else
+	salestax = 0.00
+end if
+if ttllbr > 0 then
+	labortax = round(ttllbr * (rs("LaborTaxRate") / 100),2)
+else
+	labortax = 0
+end if
+
+if ttlsub > 0 then
+	subtax = round(ttlsub * (rs("SubletTaxRate") / 100),2)
+else
+	subtax = 0
+end if
+
+nttltax = salestax + labortax + subtax
+ttlprts = notaxparts + taxparts
+             %>
+             <tr>
+              <td width="50%" align="right" class="style21" style="height: 20px">Total Parts</td>
+              <td width="50%" bgcolor="#FFFFFF" align="right" class="style15" style="height: 20px"><%=formatdollar(ttlprts)%></b>&nbsp;&nbsp;</td>
+             </tr>
+             <tr>
+              <td width="50%" align="right" style="height: 22px" class="style21">Total Labor</td>
+              <td width="50%" bgcolor="#FFFFFF" align="right" style="height: 22px" class="style15"><%=formatdollar(ttllbr)%></b>&nbsp;&nbsp;</td>
+             </tr>
+             <tr>
+              <td width="50%" align="right" class="style21">Total Sublet</td>
+              <td width="50%" bgcolor="#FFFFFF" align="right" class="style15"><%=formatdollar(ttlsub)%></b>&nbsp;&nbsp;</td>
+             </tr>
+             <tr>
+              <td width="50%" align="right" class="style21">Total Fees</td>
+              <td width="50%" bgcolor="#FFFFFF" align="right" class="style15"><%=formatdollar(rs("TotalFees"))%></b>&nbsp;&nbsp;</td>
+             </tr>
+             <tr>
+              <td width="50%" align="right" class="style21">Subtotal</td>
+              <td width="50%" bgcolor="#FFFFFF" align="right" class="style15"><%=formatdollar(cdbl(rs("TotalFees"))+ttlprts+ttllbr+ttlsub)%></b>&nbsp;&nbsp;</td>
+             </tr>
+             <tr>
+              <td width="50%" align="right" class="style21">Tax</td>
+              <td width="50%" bgcolor="#FFFFFF" align="right" class="style15"><%=formatdollar(nttltax)%></b>&nbsp;&nbsp;</td>
+             </tr>
+             <tr>
+              <td width="50%" align="right" class="style21">Discount</td>
+              <td width="50%" bgcolor="#FFFFFF" align="right" class="style15">
+               <%
+               response.write "<input type=hidden name=mysubttl value='" & ttlprts+ttllbr+ttlsub & "'>"
+              if rs("DiscountAmt") > 0 then
+              	response.write "<font color='red'>(" & formatdollar(rs("DiscountAmt")) & ")</font>"
+              else
+              	response.write formatdollar(rs("DiscountAmt"))
+              end if
+               %>
+               &nbsp;</td>
+             </tr>
+             <tr>
+              <td width="50%" align="right" class="style21">Total RO</td>
+              <td width="50%" bgcolor="#FFFFFF" align="right" class="style15"><%=formatdollar(cdbl(rs("TotalFees"))+ttlprts+ttllbr+ttlsub+nttltax-cdbl(rs("DiscountAmt")))%></b>&nbsp;&nbsp;</td>
+             </tr>
+             <center><center>
+           </table>
+           </center></center></td>
+         </tr>
+        </table></td>
+      </tr>
+      </table>
+   </td>
+  </tr>
+  </table>
+  <%
+set rs = nothing
+strsql = "Select * from repairorders where shopid = '" & request.cookies("shopid") & "' and ROID = " & request("roid")
+set nrs = con.execute(strsql)
+for fnum = 0 to nrs.fields.count-1
+	if nrs.fields(fnum).name = "ROID" then
+		response.write "<input type=hidden name='" & nrs.fields(fnum).name
+	else
+		response.write "<input type=hidden name='db" & nrs.fields(fnum).name
+	end if
+	if nrs.fields(fnum).name = "TotalLbr" then
+		response.write "' value='" & ttllbr & "'>" & chr(10)
+	elseif nrs.fields(fnum).name = "TotalPrts" then
+		response.write "' value='" & ttlprts & "'>" & chr(10)
+	elseif nrs.fields(fnum).name = "TotalSublet" then
+		response.write "' value='" & ttlsub & "'>" & chr(10)
+	elseif nrs.fields(fnum).name = "SalesTax" then
+		response.write "' value='" & nttltax & "'>" & chr(10)
+	elseif nrs.fields(fnum).name = "TotalRO" then
+		response.write "' value='" & ttllbr+ttlprts+ttlsub+nttltax & "'>" & chr(10)
+	elseif nrs.fields(fnum).name = "Subtotal" then
+		response.write "' value='" & ttllbr+ttlprts+ttlsub & "'>" & chr(10)
+	else
+		response.write "' value='" & nrs(fnum) & "'>" & chr(10)
+	end if
+	response.write "<input type=hidden name='fldtype" & nrs.fields(fnum).name
+	response.write "' value='" & nrs.fields(fnum).type & "'>" & chr(10)
+next
+
+'calc gp
+ttls = ttlprts+ttllbr
+ttlc = pc+tlc
+dprofit = ttls-ttlc
+if dprofit > 0 then gp = dprofit/ttls
+if gp > 0 then gp = formatpercent(gp)
+  %>
+</form>
+</td></tr></table>
+
+<iframe frameborder="0" src="upload/upload.asp?roid=<%=request("roid")%>" style="border:medium black outset;width:60%;height:80%;position:absolute;left:20%;top:10%;display:none;z-index:999" id="showframe"></iframe>
+<iframe id="picframe" frameborder="0" src='upload/showpics.asp?s=c&roid=<%=request("roid")%>' style="border:medium black outset;width:90%;height:90%;position:absolute;left:5%;top:5%;display:none;z-index:999"></iframe>
+
+
+
+
+<font color="#FFFFFF">
+
+
+<div id="hider"></div>
+<div id="timer">
+<img src="newimages/ajax-loader.gif">
+</div>
+
+<div style="text-align:center;border:15px black solid;color:red;background-color:white;width:90%;height:90%;position:absolute;top:5%;left:5%;z-index:1050;display:none" id="invoicediv">
+	<strong>Your Invoice is displayed below.&nbsp; Move your mouse 
+	to the bottom to print it.&nbsp; Click here to</strong>
+<input onclick="closePrint()" name="Button1" type="button" value="Close" >
+
+<iframe frameborder="0" scrolling="no" style="width:95%;height:99%;" id="invoice" name="invoice"></iframe>
+</div>
+
+<script language="javascript">
+	status = "Shop Boss Pro"
+<%
+if request("printro") = "yes" then
+%>
+
+function closePrint(){
+
+	document.getElementById("invoicediv").style.display = "none"
+	document.getElementById("hider").style.display = "none"
+
+}
+
+x = setTimeout("printRO()",200)
+
+function printRO(){
+	//alert("printing")
+	document.getElementById("hider").style.display = "block"
+	document.getElementById('timer').style.display = 'block'
+	xmlHttp=GetXmlHttpObject()
+	if (xmlHttp==null){
+		alert ("Browser does not support HTTP Request")
+		return
+	} 
+	var url="pdfinvoices/printpdfro.asp?roid=<%=request("roid")%>"
+	//alert(url)
+	xmlHttp.onreadystatechange=printROStateChanged 
+	xmlHttp.open("GET",url,true)
+	xmlHttp.send(null)
+}
+
+function printROStateChanged(){
+	document.getElementById("hider").style.display = "block"
+	if (xmlHttp.readyState==4 || xmlHttp.readyState=="complete"){
+
+		//alert(xmlHttp.responseText)
+		invname = xmlHttp.responseText
+		document.getElementById("hider").style.display = "block"
+		document.getElementById("invoicediv").style.display = "block"
+		document.getElementById("invoice").src = "pdfinvoices"+invname
+		document.getElementById('timer').style.display = 'none'
+		
+	}
+}
+
+var xmlHttp
+
+function GetXmlHttpObject(){ 
+	var objXMLHttp=null
+	if (window.XMLHttpRequest){	
+		objXMLHttp=new XMLHttpRequest()
+	}	
+	else if (window.ActiveXObject)
+	{
+	objXMLHttp=new ActiveXObject("Microsoft.XMLHTTP")
+	}
+	return objXMLHttp
+}
+
+<%
+end if
+%>
+
+</script>
+
+
+<iframe src="rohistorydata.asp?roid=<%=request("roid")%>&v=<%=nrs("vehlicnum")%>" style="display:none" id="history"></iframe>
+<script language="javascript">
+	status = "Shop Boss Pro"
+</script>
+
+</html>
+<%
+'Copyright 2011 - Boss Software Inc.
+%>
